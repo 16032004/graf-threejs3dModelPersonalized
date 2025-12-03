@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>FBX Loader – Praying</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #111827;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e5e7eb;
+    }
+
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      font-size: 14px;
+      z-index: 10;
+    }
+
+    #info a {
+      color: #93c5fd;
+      text-decoration: none;
+      margin-left: 8px;
+    }
+
+    #info a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    Praying.fbx ·
+    <a href="index.html">Volver al menú</a>
+  </div>
+
+  <!-- TODO el código va en un solo script type="module" -->
+  <script type="module">
+    import * as THREE from '../build/three.module.js';
+    import { FBXLoader } from '../jsm/loaders/FBXLoader.js';
+    import { OrbitControls } from '../jsm/controls/OrbitControls.js';
+
+    let camera, scene, renderer, clock, mixer, controls;
+
+    init();
+    animate();
+
+    function init() {
+      const container = document.body;
+
+      clock = new THREE.Clock();
+
+      // Cámara
+      camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        1,
+        2000
+      );
+      camera.position.set(100, 200, 300);
+
+      // Escena
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111827);
+
+      // Luz ambiente + direccional
+      const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambient);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+      dirLight.position.set(200, 400, 300);
+      scene.add(dirLight);
+
+      // Suelo sencillo para tener referencia
+      const grid = new THREE.GridHelper(400, 40, 0x374151, 0x1f2937);
+      scene.add(grid);
+
+      // Loader FBX
+      const loader = new FBXLoader();
+      loader.load(
+        // ⚠️ El modelo está en la misma carpeta que este HTML (examples/)
+        'Praying.fbx',
+        (object) => {
+          mixer = new THREE.AnimationMixer(object);
+
+          if (object.animations && object.animations.length > 0) {
+            const action = mixer.clipAction(object.animations[0]);
+            action.play();
+          }
+
+          object.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+
+          object.scale.setScalar(0.8);
+          scene.add(object);
+        },
+        undefined,
+        (error) => {
+          console.error('Error cargando Praying.fbx', error);
+
+          // Cubito de emergencia si falla el modelo
+          const geo = new THREE.BoxGeometry(50, 50, 50);
+          const mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8 });
+          const cube = new THREE.Mesh(geo, mat);
+          cube.position.y = 50;
+          scene.add(cube);
+        }
+      );
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      container.appendChild(renderer.domElement);
+
+      // Controles
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 100, 0);
+      controls.update();
+
+      // Resize
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      if (mixer) mixer.update(delta);
+
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
